@@ -71,8 +71,7 @@ app.post("/buscar", async (req, res) => {
                     console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
                     break;
                 }
-                
-             
+               
                 await page.waitForSelector("main.container > .box_grid > .p10 a", { timeout: 10000 });
             } catch (navigationOrSelectorError) {
                 console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);

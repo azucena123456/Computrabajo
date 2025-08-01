@@ -176,7 +176,8 @@ const ResultsPage = ({
 
     const handleExport = async (format) => {
         try {
-            const response = await fetch(`http://localhost:3001/export/${format}`, {
+            // Updated URL for export functionality
+            const response = await fetch(`https://computrabajo.onrender.com/export/${format}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -233,7 +234,7 @@ const ResultsPage = ({
                             <div className="flex flex-wrap justify-center gap-2 sm:gap-4 border-b-2 border-gray-200 pb-4 mb-8">
                                 <button
                                     onClick={() => { setSelectedTab('all'); }}
-                                    className={`py-3 px-5 sm:px-6 rounded-lg font-semibold text-base sm:text-lg transition-all duration-300 ${
+                                    className={`flex-1 min-w-[120px] sm:flex-none py-3 px-3 sm:px-6 rounded-lg font-semibold text-sm sm:text-lg transition-all duration-300 ${
                                         selectedTab === 'all'
                                             ? 'bg-indigo-600 text-white shadow-md'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-800'
@@ -243,7 +244,7 @@ const ResultsPage = ({
                                 </button>
                                 <button
                                     onClick={() => { setSelectedTab('topHigh'); }}
-                                    className={`py-3 px-5 sm:px-6 rounded-lg font-semibold text-base sm:text-lg transition-all duration-300 ${
+                                    className={`flex-1 min-w-[120px] sm:flex-none py-3 px-3 sm:px-6 rounded-lg font-semibold text-sm sm:text-lg transition-all duration-300 ${
                                         selectedTab === 'topHigh'
                                             ? 'bg-indigo-600 text-white shadow-md'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-800'
@@ -253,7 +254,7 @@ const ResultsPage = ({
                                 </button>
                                 <button
                                     onClick={() => { setSelectedTab('topLow'); }}
-                                    className={`py-3 px-5 sm:px-6 rounded-lg font-semibold text-base sm:text-lg transition-all duration-300 ${
+                                    className={`flex-1 min-w-[120px] sm:flex-none py-3 px-3 sm:px-6 rounded-lg font-semibold text-sm sm:text-lg transition-all duration-300 ${
                                         selectedTab === 'topLow'
                                             ? 'bg-indigo-600 text-white shadow-md'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-800'
@@ -263,7 +264,7 @@ const ResultsPage = ({
                                 </button>
                                 <button
                                     onClick={() => { setSelectedTab('location'); }}
-                                    className={`py-3 px-5 sm:px-6 rounded-lg font-semibold text-base sm:text-lg transition-all duration-300 ${
+                                    className={`flex-1 min-w-[120px] sm:flex-none py-3 px-3 sm:px-6 rounded-lg font-semibold text-sm sm:text-lg transition-all duration-300 ${
                                         selectedTab === 'location'
                                             ? 'bg-indigo-600 text-white shadow-md'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 hover:text-gray-800'
@@ -273,7 +274,7 @@ const ResultsPage = ({
                                 </button>
                                 <button
                                     onClick={() => { setSelectedTab('about'); }}
-                                    className={`py-3 px-5 sm:px-6 rounded-lg font-semibold text-base sm:text-lg transition-all duration-300 ${
+                                    className={`flex-1 min-w-[120px] sm:flex-none py-3 px-3 sm:px-6 rounded-lg font-semibold text-sm sm:text-lg transition-all duration-300 ${
                                         selectedTab === 'about'
                                             ? 'bg-indigo-600 text-white shadow-md'
                                             : 'bg-gray-200 text-gray-700'
@@ -285,28 +286,28 @@ const ResultsPage = ({
 
                             {selectedTab === 'all' && (
                                 <>
-                                    <div className="flex justify-end gap-3 mb-6">
+                                    <div className="flex flex-wrap justify-end gap-2 mb-6">
                                         <button
                                             onClick={() => handleExport('json')}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm flex-1 sm:flex-none"
                                         >
                                             Exportar JSON
                                         </button>
                                         <button
                                             onClick={() => handleExport('xlsx')}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm flex-1 sm:flex-none"
                                         >
                                             Exportar XLSX
                                         </button>
                                         <button
                                             onClick={() => handleExport('csv')}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm flex-1 sm:flex-none"
                                         >
                                             Exportar CSV
                                         </button>
                                         <button
                                             onClick={() => handleExport('pdf')}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 transform hover:scale-105 text-sm flex-1 sm:flex-none"
                                         >
                                             Exportar PDF
                                         </button>

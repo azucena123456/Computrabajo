@@ -51,9 +51,9 @@ app.post("/buscar", async (req, res) => {
             'Referer': 'https://www.google.com/', 
         });
 
-        let allEnlaces = [];
+        let trabajos = [];
         let pagina = 1;
-        const maxPagesToScrape = 2;
+        const maxPagesToScrape = 5;
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
@@ -61,7 +61,7 @@ app.post("/buscar", async (req, res) => {
 
             try {
                 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
 
                 const noResults = await page.evaluate(() => {
                     return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
@@ -95,90 +95,77 @@ app.post("/buscar", async (req, res) => {
                 break;
             }
 
-            allEnlaces.push(...enlaces);
-            pagina++;
-        }
-        
-        await page.close(); // Cierra la página de listados
+            for (const enlace of enlaces) {
+                console.log(`Extrayendo datos de: ${enlace}`);
+                
+                try {
+                    await page.goto(enlace, {
+                        waitUntil: "domcontentloaded",
+                        timeout: 30000,
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
 
-        console.log(`Enlaces totales para extraer: ${allEnlaces.length}`);
+                    const datos = await page.evaluate(() => {
+                        const textoSelector = (sel) =>
+                            document.querySelector(sel)?.innerText.trim() ||
+                            "No disponible";
 
-        const trabajos = [];
-        const concurrencyLimit = 5; // Límite de páginas a raspar concurrentemente
-        
-        // Función para extraer datos de una sola página de detalle
-        const scrapeDetailPage = async (browser, url) => {
-            const detailPage = await browser.newPage();
-            try {
-                await detailPage.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-                const datos = await detailPage.evaluate(() => {
-                    const textoSelector = (sel) =>
-                        document.querySelector(sel)?.innerText.trim() ||
-                        "No disponible";
+                        const ubicacionTexto = textoSelector(
+                            "main.detail_fs > div.container > p.fs16"
+                        );
+                        const empresa_ubi = ubicacionTexto.split(" - ");
+                        const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
+                        const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
 
-                    const ubicacionTexto = textoSelector(
-                        "main.detail_fs > div.container > p.fs16"
-                    );
-                    const empresa_ubi = ubicacionTexto.split(" - ");
-                    const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
-                    const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
+                        const descripcion = textoSelector(
+                            "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
+                        );
+                        const descrip = descripcion.replace(/\n/g, " ").trim();
 
-                    const descripcion = textoSelector(
-                        "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
-                    );
-                    const descrip = descripcion.replace(/\n/g, " ").trim();
+                        const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
+                        const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
 
-                    const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
-                    const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
+                        let fechaPublicacion = "No disponible";
+                        const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
+                        const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
+                        const dateElement3 = document.querySelector('span.date');
 
-                    let fechaPublicacion = "No disponible";
-                    const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
-                    const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
-                    const dateElement3 = document.querySelector('span.date');
-
-                    if (dateElement1) {
-                        fechaPublicacion = dateElement1.innerText.trim();
-                    } else if (dateElement2) {
-                        fechaPublicacion = dateElement2.innerText.trim();
-                    } else if (dateElement3) {
-                        fechaPublicacion = dateElement3.innerText.trim();
-                    } else {
-                        const pageText = document.body.innerText;
-                        const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
-                        const match = pageText.match(dateRegex);
-                        if (match && match[0]) {
-                            fechaPublicacion = match[0].trim();
+                        if (dateElement1) {
+                            fechaPublicacion = dateElement1.innerText.trim();
+                        } else if (dateElement2) {
+                            fechaPublicacion = dateElement2.innerText.trim();
+                        } else if (dateElement3) {
+                            fechaPublicacion = dateElement3.innerText.trim();
+                        } else {
+                            const pageText = document.body.innerText;
+                            const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
+                            const match = pageText.match(dateRegex);
+                            if (match && match[0]) {
+                                fechaPublicacion = match[0].trim();
+                            }
                         }
-                    }
 
-                    return {
-                        titulo: textoSelector("h1"),
-                        empresa: empresa,
-                        ubicacion: location,
-                        salario: salario,
-                        descripcion: descrip,
-                        url: window.location.href,
-                        fechaPublicacion: fechaPublicacion,
-                    };
-                });
-                return datos;
-            } catch (err) {
-                console.warn(`Error al extraer datos de ${url}: ${err.message}`);
-                return null;
-            } finally {
-                await detailPage.close();
+                        return {
+                            titulo: textoSelector("h1"),
+                            empresa: empresa,
+                            ubicacion: location,
+                            salario: salario,
+                            descripcion: descrip,
+                            url: window.location.href,
+                            fechaPublicacion: fechaPublicacion,
+                        };
+                    });
+
+                    trabajos.push(datos);
+
+                } catch (err) {
+                    console.warn(
+                        `Error al extraer datos de ${enlace}: ${err.message}`
+                    );
+                }
             }
-        };
 
-        const chunks = [];
-        for (let i = 0; i < allEnlaces.length; i += concurrencyLimit) {
-            chunks.push(allEnlaces.slice(i, i + concurrencyLimit));
-        }
-
-        for (const chunk of chunks) {
-            const pagePromises = chunk.map(enlace => scrapeDetailPage(browser, enlace));
-            const results = await Promise.all(pagePromises);
-            trabajos.push(...results.filter(Boolean));
+            pagina++;
         }
 
         res.status(200).send({

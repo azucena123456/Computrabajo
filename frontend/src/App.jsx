@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import ResultsPage from './ResultsPage.jsx';
 
-const API_BASE_URL = 'https://computrabajo-backend.onrender.com';
+
+const API_BASE_URL = 'https://computrabajo.onrender.com';
 
 const MIN_SEARCH_TERM_LENGTH = 3;
 const MAX_DOTS_ALLOWED = 2;
@@ -119,7 +120,7 @@ function App() {
         value = value.replace(/\s{2,}/g, ' ');
 
         setSearchTerm(value);
-        setErrorMessage(''); // Clear the main error message
+        setErrorMessage(''); 
 
         if (value.length > 0) {
             const firstChar = value[0];

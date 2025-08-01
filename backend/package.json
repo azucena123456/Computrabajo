@@ -4,8 +4,7 @@
   "description": "Backend API for web scraping",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "postinstall": "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer-core@24.15.0"
+    "start": "node app.js"
   },
   "keywords": [],
   "author": "",

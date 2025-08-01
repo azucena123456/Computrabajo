@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preguntas Frecuentes | Gym-PowerZone (Tema Oscuro)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a; 
+            color: #e0e0e0; 
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .faq-wrapper {
+            background-color: #212121; /* Sombra más pronunciada en tema oscuro */
+            border-radius: 16px;
+            max-width: 900px;
+            margin: 80px auto;
+            padding: 50px 40px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        
+
+        h2 {
+            font-family: 'Poppins', sans-serif;
+            color: #ffffff; 
+            text-align: center;
+            margin-bottom: 60px;
+            font-size: 2.5em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background-color: #ff5722; 
+            border-radius: 2px;
+        }
+
+        h3{
+            font-family: 'Poppins', sans-serif;
+            color: #f5f5f5; 
+            margin-top: 50px;
+            margin-bottom: 25px;
+            font-size: 1.6em;
+            font-weight: 700;
+            position: relative;
+            padding-left: 25px;
+        }
+        h3::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 100%;
+            background-color: #ff5722; 
+            border-radius: 4px;
+        }
+
+        .faq-item {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #424242; 
+        }
+        .faq-item:last-of-type {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .faq-question {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            color: #bdbdbd; 
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.05em;
+            padding: 15px 0;
+            transition: color 0.3s ease-in-out;
+        }
+        .faq-question:hover {
+            color: #ff5722; 
+        }
+        .faq-question::after {
+            content: '+';
+            margin-left: 15px;
+            color: #ff5722; 
+            font-size: 1.5em;
+            line-height: 1;
+            transition: transform 0.3s ease-in-out;
+        }
+        .faq-question.active::after {
+            content: '-';
+            transform: rotate(0deg);
+        }
+        .faq-answer {
+            color: #b0b0b0; 
+            margin-top: 10px;
+            line-height: 1.6;
+            display: none;
+            overflow: hidden;
+            transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .faq-answer::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background-color: #ff5722;
+            opacity: 0.15; 
+            border-radius: 1.5px;
+        }
+        .faq-answer.show {
+            display: block;
+            max-height: 500px;
+            opacity: 1;
+        }
+        .faq-answer ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 8px;
+        }
+        .faq-answer ul li {
+            margin-bottom: 8px;
+            position: relative;
+            padding-left: 20px;
+        }
+        .faq-answer ul li::before {
+            content: '•';
+            color: #ff5722; 
+            font-size: 1.2em;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        .faq-answer strong {
+            color: #ff5722; 
+            font-weight: 700;
+        }
+        .faq-answer a {
+            color: #ff5722; 
+            text-decoration: none;
+            font-weight: 700;
+            transition: text-decoration 0.3s ease-in-out;
+        }
+        .faq-answer a:hover {
+            text-decoration: underline;
+        }
+
+        
+        @media (max-width: 900px) {
+            .faq-wrapper {
+                margin: 60px 20px;
+                padding: 40px;
+                border-radius: 12px;
+            }
+        }
+        @media (max-width: 768px) {
+            h3 {
+                font-size: 2.2em;
+                margin-bottom: 50px;
+                padding-bottom: 18px;
+            }
+            h2::after {
+                width: 70px;
+            }
+            h3 {
+                font-size: 1.5em;
+                margin-top: 40px;
+                margin-bottom: 20px;
+                padding-left: 20px;
+            }
+            h3::before {
+                width: 7px;
+            }
+            .faq-question {
+                font-size: 1em;
+                padding: 12px 0;
+            }
+            .faq-answer {
+                padding-left: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .faq-wrapper {
+                padding: 25px;
+                margin: 30px 15px;
+                border-radius: 10px;
+            }
+            h2 {
+                font-size: 1.8em;
+                letter-spacing: 1.5px;
+                margin-bottom: 35px;
+                padding-bottom: 15px;
+            }
+            h2::after {
+                width: 40px;
+                height: 2px;
+            }
+            h3 {
+                font-size: 1.3em;
+                margin-top: 30px;
+                margin-bottom: 18px;
+                padding-left: 15px;
+            }
+            h3::before {
+                width: 6px;
+            }
+            .faq-question {
+                font-size: 0.95em;
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 10px 0;
+            }
+            .faq-question::after {
+                margin-left: 0;
+                margin-top: 5px;
+                align-self: flex-end;
+                font-size: 1.3em;
+            }
+            .faq-answer {
+                padding-left: 15px;
+                margin-top: 8px;
+            }
+            .faq-answer ul li {
+                padding-left: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="faq-wrapper">
+        <h2>Preguntas Frecuentes</h2>
+
+        <h3>Membresías y Precios</h3>
+        <div class="faq-item">
+            <div class="faq-question">¿Qué tipo de membresías ofrecen?</div>
+            <div class="faq-answer">
+                Nuestra membresía regular tiene un costo de <strong>$400 por mes</strong>. ¡Pero si eres nuevo, puedes obtener hasta <strong>3 meses GRATIS</strong>! Esta membresía te da acceso completo a pesas, cardio, HIIT, la zona funcional y mucho más.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-question">¿Hay descuentos para estudiantes o grupos?</div>
+            <div class="faq-answer">
+                Sí, ofrecemos descuentos especiales para estudiantes con credencial vigente y para grupos a partir de 5 personas. Por favor, contacta a nuestro equipo de ventas para más detalles sobre las tarifas grupales y los requisitos.
+            </div>
+        </div>
+
+        <h3>Horarios y Ubicación</h3>
+        <div class="faq-item">
+            <div class="faq-question">¿Cuál es el horario de atención?</div>
+            <div class="faq-answer">
+                Estamos abiertos de Lunes a Viernes de <strong>6:00 AM a 10:00 PM</strong>, y los Sábados de <strong>8:00 AM a 4:00 PM</strong>. Los Domingos, el gimnasio permanece cerrado.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-question">¿Dónde se encuentran ubicados?</div>
+            <div class="faq-answer">
+                Nuestra sede principal está en el centro de la ciudad, en Av. Siempre Viva #123. También contamos con sucursales en las principales zonas de la ciudad. Puedes ver un mapa detallado en nuestra sección de <a href="#contacto">Contacto</a>.
+            </div>
+        </div>
+
+        <h3>Entrenadores y Servicios</h3>
+        <div class="faq-item">
+            <div class="faq-question">¿Ofrecen entrenamiento personalizado?</div>
+            <div class="faq-answer">
+                Sí, en Gym-PowerZone ofrecemos programas especializados y atención personalizada con nuestros entrenadores certificados. Puedes agendar una sesión de prueba gratuita para conocer a tu futuro entrenador.
+            </div>
+        </div>
+        <div class="faq-item">
+            <div class="faq-question">¿Hay clases grupales disponibles?</div>
+            <div class="faq-answer">
+                ¡Absolutamente! Contamos con una amplia variedad de clases grupales como spinning, zumba, yoga, pilates y clases de alta intensidad. Puedes consultar el horario semanal de clases en nuestra <a href="#clases">página de clases</a>.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const questions = document.querySelectorAll('.faq-question');
+
+            questions.forEach(question => {
+                question.addEventListener('click', () => {
+                    const answer = question.nextElementSibling;
+                    const isActive = question.classList.toggle('active');
+
+                    // Close all other open answers
+                    document.querySelectorAll('.faq-answer.show').forEach(openAnswer => {
+                        if (openAnswer !== answer) {
+                            openAnswer.style.maxHeight = "0";
+                            const correspondingQuestion = openAnswer.previousElementSibling;
+                            if (correspondingQuestion) {
+                                correspondingQuestion.classList.remove('active');
+                            }
+                            openAnswer.addEventListener('transitionend', function handler() {
+                                openAnswer.classList.remove('show');
+                                openAnswer.removeEventListener('transitionend', handler);
+                            });
+                        }
+                    });
+
+                    if (isActive) {
+                        answer.classList.add('show');
+                        answer.style.maxHeight = answer.scrollHeight + "px";
+                    } else {
+                        answer.style.maxHeight = "0";
+                        answer.addEventListener('transitionend', function handler() {
+                            answer.classList.remove('show');
+                            answer.removeEventListener('transitionend', handler);
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

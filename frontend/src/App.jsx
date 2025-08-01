@@ -184,7 +184,7 @@ function App() {
             </header>
 
             <div className="-mt-16 px-4 relative z-20 transition-all duration-500">
-                <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-y-4 sm:gap-4 max-w-2xl mx-auto w-full bg-white p-4 rounded-full shadow-2xl border border-indigo-200 transition-all duration-500 items-center">
+                <form onSubmit={handleSubmit} className="flex flex-row gap-4 max-w-2xl mx-auto w-full bg-white p-4 rounded-full shadow-2xl border border-indigo-200 transition-all duration-500 items-center">
                     <input
                         type="text"
                         className="flex-grow p-3 border-none rounded-full focus:outline-none text-lg text-gray-800 placeholder-gray-400 w-full"
@@ -197,7 +197,7 @@ function App() {
                     />
                     <button
                         type="submit"
-                        className="bg-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105 w-full sm:w-auto whitespace-nowrap"
+                        className="bg-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105 w-auto whitespace-nowrap flex-shrink-0"
                         disabled={loading}
                     >
                         {loading ? 'Buscando...' : 'Buscar Empleos'}

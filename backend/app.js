@@ -11,6 +11,7 @@ puppeteer.use(StealthPlugin());
 const app = express();
 const port = process.env.PORT || 3001;
 
+
 const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'];
 
 const corsOptions = {
@@ -18,6 +19,7 @@ const corsOptions = {
         if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
             callback(null, true);
         } else {
+            console.error(`Petición bloqueada por CORS desde el origen: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -46,7 +48,7 @@ app.post("/buscar", async (req, res) => {
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
 
         const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
-        console.log(`Ruta del ejecutable de Puppeteer: ${executablePath}`); // Línea de depuración añadida
+        console.log(`Ruta del ejecutable de Puppeteer: ${executablePath}`); // Línea de depuración para verificar la ruta
         
         browser = await puppeteer.launch({
             headless: true, 

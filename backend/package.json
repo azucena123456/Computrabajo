@@ -4,7 +4,8 @@
   "description": "Backend API for web scraping",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "postinstall": "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true npm install puppeteer-core@24.15.0"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +19,9 @@
     "json2csv": "^6.0.0-alpha.2",
     "pdfkit": "^0.17.1",
     "puppeteer": "^24.15.0",
+    "puppeteer-core": "^24.15.0",
+    "puppeteer-extra": "^3.3.1",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "xlsx": "^0.18.5"
   }
 }

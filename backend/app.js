@@ -1,9 +1,12 @@
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-extra"); 
+const StealthPlugin = require("puppeteer-extra-plugin-stealth"); 
 const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
 
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+
+puppeteer.use(StealthPlugin());
 
 const app = express();
 const port = process.env.PORT || 3001;

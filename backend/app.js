@@ -1,23 +1,16 @@
-const puppeteer = require("puppeteer-extra"); 
-const StealthPlugin = require("puppeteer-extra-plugin-stealth"); 
+const chromium = require('@sparticuz/chromium');
+const puppeteer = require("puppeteer"); 
 const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
 
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
-puppeteer.use(StealthPlugin());
-
 const app = express();
 const port = process.env.PORT || 3001;
 
 
-const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -37,30 +30,13 @@ app.post("/buscar", async (req, res) => {
         )}`;
 
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
-
-        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'; // Usamos la ruta fija de Render
-        console.log(`Ruta del ejecutable de Puppeteer: ${executablePath}`);
         
+        // Usamos @sparticuz/chromium para entornos de Render
         browser = await puppeteer.launch({
-            headless: true, 
-            executablePath: executablePath,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-features=site-per-process',
-                '--disable-site-isolation-trials',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--blink-settings=imagesEnabled=false',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                '--disable-cache'
-            ],
-            dumpio: true,
+            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
         });
 
         const page = await browser.newPage();

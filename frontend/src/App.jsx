@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import ResultsPage from './ResultsPage.jsx';
-import { parseSalario } from './utils/helpers';
 
-// Assuming you went with hardcoding or relative path from previous step
-const API_BASE_URL = 'http://localhost:3001'; // Or simply remove and use "/buscar" if proxy is configured
+const API_BASE_URL = 'https://computrabajo-backend.onrender.com';
 
 const MIN_SEARCH_TERM_LENGTH = 3;
 const MAX_DOTS_ALLOWED = 2;
@@ -101,7 +99,7 @@ function App() {
             }
         } catch (error) {
             console.error('Error al obtener datos:', error);
-            setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Error: ${error.message}. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);
+            setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);
             setOffers([]);
             setTotalResultsCount(0);
             setShowResultsPage(false);

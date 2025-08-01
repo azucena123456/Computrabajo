@@ -1,258 +1,259 @@
-import React, { useState } from 'react';
-import ResultsPage from './ResultsPage.jsx';
+const puppeteer = require("puppeteer");
+const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
 
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
 
-const API_BASE_URL = 'https://computrabajo.onrender.com';
+const app = express();
+const port = process.env.PORT || 3001;
 
-const MIN_SEARCH_TERM_LENGTH = 3;
-const MAX_DOTS_ALLOWED = 2;
-const DISALLOWED_START_CHARS_REGEX = /[!@#$%^&*()_+={}\]|;:'",<>/?`~-]/;
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'];
 
-function App() {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [offers, setOffers] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
-    const [inputError, setInputError] = useState('');
-    const [downloadInfo, setDownloadInfo] = useState(null);
-    const [showResultsPage, setShowResultsPage] = useState(false);
-    const [totalResultsCount, setTotalResultsCount] = useState(0);
-
-    const validateSearchTerm = (term) => {
-        if (!term.trim()) {
-            return 'El campo de búsqueda no puede estar vacío.';
-        }
-        if (DISALLOWED_START_CHARS_REGEX.test(term[0]) && term[0] !== '.') {
-            return 'El término de búsqueda no puede empezar con la mayoría de los caracteres especiales. Los puntos son permitidos si el contexto lo requiere.';
-        }
-        if (term.length < MIN_SEARCH_TERM_LENGTH) {
-            return `El término de búsqueda debe contener al menos ${MIN_SEARCH_TERM_LENGTH} letras.`;
-        }
-        const containsLetters = /[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/.test(term);
-        const containsNumbers = /\d/.test(term);
-        if (containsNumbers && !containsLetters) {
-            return 'El término de búsqueda no puede contener solo números. Debe incluir texto.';
-        }
-        const dotCount = (term.match(/\./g) || []).length;
-        if (dotCount > MAX_DOTS_ALLOWED) {
-            return `El término de búsqueda no puede contener más de ${MAX_DOTS_ALLOWED} puntos (.).`;
-        }
-        if (dotCount > 0 && !containsLetters && containsNumbers) {
-            return 'El término de búsqueda no puede contener solo números y puntos. Debe incluir texto.';
-        }
-        return '';
-    };
-
-    const handleSearch = async () => {
-        const trimmedSearchTerm = searchTerm.trim();
-        const validationMessage = validateSearchTerm(trimmedSearchTerm);
-
-        if (validationMessage) {
-            setErrorMessage(validationMessage);
-            setOffers([]);
-            setShowResultsPage(false);
-            setTotalResultsCount(0);
-            return;
-        }
-
-        setErrorMessage('');
-        setInputError('');
-
-        setLoading(true);
-        setOffers([]);
-        setDownloadInfo(null);
-        setShowResultsPage(false);
-        setTotalResultsCount(0);
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/buscar`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ cargo: trimmedSearchTerm }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: 'Error desconocido del servidor.' }));
-                setOffers([]);
-                setTotalResultsCount(0);
-                throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (data.offers && Array.isArray(data.offers) && data.offers.length > 0) {
-                setOffers(data.offers);
-                setTotalResultsCount(data.totalResultsCount || data.offers.length);
-
-                const busquedaFormatted = trimmedSearchTerm.replace(/\s+/g, '_').toLowerCase().replace(/[^a-z0-9_.-]/g, "");
-                const datePart = new Date().toISOString().split('T')[0];
-                const baseFileName = `ofertas_${busquedaFormatted}_${datePart}`;
-
-                setDownloadInfo({ baseFileName, puesto: trimmedSearchTerm });
-                setShowResultsPage(true);
-            } else {
-                setErrorMessage(`No se encontraron ofertas para "${trimmedSearchTerm}". Intenta con otro término.`);
-                setOffers([]);
-                setTotalResultsCount(0);
-                setShowResultsPage(false);
-            }
-        } catch (error) {
-            console.error('Error al obtener datos:', error);
-            setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);
-            setOffers([]);
-            setTotalResultsCount(0);
-            setShowResultsPage(false);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDownload = async (format) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/export/${format}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ offers, searchTerm }),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || `Error al exportar a ${format}: ${response.status}`);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${downloadInfo.baseFileName}.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Error al descargar el archivo:', error);
-            alert(`Error al descargar el archivo: ${error.message}`);
-        }
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        handleSearch();
-    };
-
-    const handleSearchInputChange = (e) => {
-        let value = e.target.value;
-        value = value.trimStart();
-        value = value.replace(/\s{2,}/g, ' ');
-
-        setSearchTerm(value);
-        setErrorMessage(''); 
-
-        if (value.length > 0) {
-            const firstChar = value[0];
-            if (DISALLOWED_START_CHARS_REGEX.test(firstChar) && firstChar !== '.') {
-                setInputError('No puede empezar con la mayoría de caracteres especiales.');
-            } else if (value.length < MIN_SEARCH_TERM_LENGTH && value.length > 0) {
-                setInputError(`Mínimo ${MIN_SEARCH_TERM_LENGTH} letras.`);
-            } else if (/\d/.test(value) && !/[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/.test(value)) {
-                setInputError('Debe incluir texto, no solo números.');
-            } else if ((value.match(/\./g) || []).length > MAX_DOTS_ALLOWED) {
-                setInputError(`Máximo ${MAX_DOTS_ALLOWED} puntos (.).`);
-            } else {
-                setInputError('');
-            }
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+            callback(null, true);
         } else {
-            setInputError('');
+            callback(new Error('Not allowed by CORS'));
         }
-    };
+    },
+    optionsSuccessStatus: 200
+};
 
-    const LoadingSpinner = () => {
-        return (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500"></div>
-                <p className="mt-4 text-indigo-600 text-xl font-semibold">Cargando ofertas, por favor espera...</p>
-                <p className="text-gray-500 text-sm mt-2">Esto puede tomar un momento, el scraper está trabajando en segundo plano.</p>
-            </div>
-        );
-    };
+app.use(cors(corsOptions));
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
-    if (showResultsPage) {
-        return (
-            <ResultsPage
-                offers={offers}
-                searchTerm={searchTerm}
-                errorMessage={errorMessage}
-                downloadInfo={downloadInfo}
-                totalResultsCount={totalResultsCount}
-                onBackToSearch={() => {
-                    setShowResultsPage(false);
-                    setOffers([]);
-                    setSearchTerm('');
-                    setErrorMessage('');
-                    setInputError('');
-                    setDownloadInfo(null);
-                    setTotalResultsCount(0);
-                }}
-                onDownload={handleDownload}
-            />
-        );
+app.get("/", (req, res) => {
+    res.status(200).send({
+        message: "Server funcionando",
+    });
+});
+
+app.post("/buscar", async (req, res) => {
+    let { cargo } = req.body;
+
+    let browser;
+    try {
+        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(
+            cargo
+        )}`;
+
+        console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
+
+        const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+        
+        browser = await puppeteer.launch({
+            headless: true, 
+            executablePath: executablePath,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--disable-features=site-per-process',
+                '--disable-site-isolation-trials',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                '--blink-settings=imagesEnabled=false',
+                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                '--disable-cache'
+            ],
+            dumpio: true,
+        });
+
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Referer': 'https://www.google.com/', 
+        });
+
+        let trabajos = [];
+        let pagina = 1;
+        const maxPagesToScrape = 5;
+
+        while (pagina <= maxPagesToScrape) {
+            const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
+            console.log(`Visitando página de listados: ${url}`);
+
+            try {
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
+                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+
+                await page.waitForSelector("article a", { timeout: 10000 });
+            } catch (navigationOrSelectorError) {
+                console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
+                break; 
+            }
+
+            const enlaces = await page.$$eval("article a", (links) =>
+                Array.from(
+                    new Set(
+                        links
+                            .map((link) => link.href)
+                            .filter((href) => href.includes("/ofertas-de-trabajo/"))
+                    )
+                )
+            );
+
+            if (enlaces.length === 0) {
+                console.log(
+                    "No hay más ofertas en esta página o los enlaces no fueron detectados, fin del scraping."
+                );
+                break;
+            }
+
+            for (const enlace of enlaces) {
+                console.log(`Extrayendo datos de: ${enlace}`);
+                
+                try {
+                    await page.goto(enlace, {
+                        waitUntil: "domcontentloaded",
+                        timeout: 30000,
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+
+                    const datos = await page.evaluate(() => {
+                        const textoSelector = (sel) =>
+                            document.querySelector(sel)?.innerText.trim() ||
+                            "No disponible";
+
+                        const ubicacionTexto = textoSelector(
+                            "main.detail_fs > div.container > p.fs16"
+                        );
+                        const empresa_ubi = ubicacionTexto.split(" - ");
+                        const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
+                        const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
+
+                        const descripcion = textoSelector(
+                            "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
+                        );
+                        const descrip = descripcion.replace(/\n/g, " ").trim();
+
+                        const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
+                        const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
+
+                        let fechaPublicacion = "No disponible";
+                        const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
+                        const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
+                        const dateElement3 = document.querySelector('span.date');
+
+                        if (dateElement1) {
+                            fechaPublicacion = dateElement1.innerText.trim();
+                        } else if (dateElement2) {
+                            fechaPublicacion = dateElement2.innerText.trim();
+                        } else if (dateElement3) {
+                            fechaPublicacion = dateElement3.innerText.trim();
+                        } else {
+                            const pageText = document.body.innerText;
+                            const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
+                            const match = pageText.match(dateRegex);
+                            if (match && match[0]) {
+                                fechaPublicacion = match[0].trim();
+                            }
+                        }
+
+                        return {
+                            titulo: textoSelector("h1"),
+                            empresa: empresa,
+                            ubicacion: location,
+                            salario: salario,
+                            descripcion: descrip,
+                            url: window.location.href,
+                            fechaPublicacion: fechaPublicacion,
+                        };
+                    });
+
+                    trabajos.push(datos);
+
+                } catch (err) {
+                    console.warn(
+                        `Error al extraer datos de ${enlace}: ${err.message}`
+                    );
+                }
+            }
+
+            pagina++;
+        }
+
+        res.status(200).send({
+            offers: trabajos,
+            totalResultsCount: trabajos.length,
+            message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
+        });
+    } catch (error) {
+        console.error("Error global durante el scraping:", error);
+        res.status(500).send({
+            message: `Error en el scraping: ${error.message || error}`,
+        });
+    } finally {
+        if (browser) {
+            await browser.close();
+        }
+    }
+});
+
+app.post('/export/:format', async (req, res) => {
+    const { format } = req.params;
+    const { offers, searchTerm } = req.body;
+
+    if (!offers || !Array.isArray(offers) || offers.length === 0) {
+        return res.status(400).send('No se proporcionaron datos válidos para exportar.');
     }
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 via-indigo-50 font-sans text-gray-900">
-            <header className="bg-gradient-to-r from-indigo-700 to-purple-800 text-white py-20 px-4 shadow-lg relative z-10">
-                <div className="max-w-4xl mx-auto text-center">
-                    <h1 className="text-5xl md:text-6xl font-extrabold leading-tight tracking-tight mb-4 transition-all duration-300">
-                        Buscador de Empleos
-                    </h1>
-                    <p className="text-xl opacity-90 mb-8 transition-all duration-300">
-                        Encuentra tu próxima oportunidad laboral en Computrabajo.
-                    </p>
-                </div>
-            </header>
+    const cleanedSearchTerm = searchTerm
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-z0-9_.-]/g, "");
+    const filename = `ofertas_${cleanedSearchTerm}_${new Date().toISOString().split('T')[0]}.${format}`;
 
-            <div className="-mt-16 px-4 relative z-20 transition-all duration-500">
-                <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-y-4 sm:gap-4 max-w-2xl mx-auto bg-white p-4 rounded-full shadow-2xl border border-indigo-200 transition-all duration-500 items-center">
-                    <input
-                        type="text"
-                        className="flex-grow p-3 border-none rounded-full focus:outline-none text-lg text-gray-800 placeholder-gray-400 w-full"
-                        placeholder="Ej: Marketing, Contabilidad, Ingeniería, Medicina..."
-                        value={searchTerm}
-                        onChange={handleSearchInputChange}
-                        aria-label="Término de búsqueda de empleo"
-                        aria-describedby={inputError ? "input-error-message" : undefined}
-                        disabled={loading}
-                    />
-                    <button
-                        type="submit"
-                        className="bg-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105 w-auto sm:w-auto whitespace-nowrap"
-                        disabled={loading}
-                    >
-                        {loading ? 'Buscando...' : 'Buscar Empleos'}
-                    </button>
-                </form>
-                {inputError && (
-                    <p id="input-error-message" className="text-red-500 text-sm mt-2 text-center">
-                        {inputError}
-                    </p>
-                )}
-            </div>
+    try {
+        let buffer;
+        let contentType;
 
-            <main className="container mx-auto px-4 py-8">
-                {loading && <LoadingSpinner />}
-                {errorMessage && (
-                    <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg relative mt-8 shadow-md" role="alert">
-                        <strong className="font-bold">¡Error!</strong>
-                        <span className="block sm:inline ml-2">{errorMessage}</span>
-                    </div>
-                )}
-            </main>
-        </div>
-    );
-}
+        switch (format) {
+            case 'json':
+                buffer = generateJsonBuffer(offers);
+                contentType = 'application/json';
+                break;
+            case 'csv':
+                buffer = generateCsvBuffer(offers);
+                contentType = 'text/csv';
+                break;
+            case 'xlsx':
+                buffer = generateXlsxBuffer(offers);
+                contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                break;
+            case 'pdf': 
+                buffer = await generatePdfBuffer(offers, searchTerm);
+                contentType = 'application/pdf';
+                break;
+            default:
+                return res.status(400).send('Formato de exportación no soportado.');
+        }
 
-export default App;
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+
+    } catch (error) {
+        console.error(`Error al generar o enviar el archivo ${format}:`, error);
+        res.status(500).send(`Error al generar el archivo ${format}.`);
+    }
+});
+
+app.listen(port, () => {
+    console.log(`Server running in http://localhost:${port}`);
+});

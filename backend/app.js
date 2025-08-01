@@ -46,6 +46,7 @@ app.post("/buscar", async (req, res) => {
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
 
         const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath();
+        console.log(`Ruta del ejecutable de Puppeteer: ${executablePath}`); // Línea de depuración añadida
         
         browser = await puppeteer.launch({
             headless: true, 

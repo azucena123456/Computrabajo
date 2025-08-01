@@ -1,0 +1,38 @@
+# Dependencias de Node.js 
+backend/node_modules/
+
+
+# Archivos relacionados con Expo
+.expo/
+
+# Configuraciones de VSCode
+.vscode/
+
+# Carpetas de datos en el backend
+backend/data/
+
+# Archivos de registro
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos ejecutables para WhatsApp (asumiendo que no son parte del código principal que necesita ser versionado)
+ejecutar_whatsapp.bat
+enviar_whatsapp.py
+
+# Dependencias de Node.js 
+frontend/node_modules/

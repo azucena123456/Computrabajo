@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import ResultsPage from './ResultsPage.jsx';
 
-
 const API_BASE_URL = 'https://computrabajo.onrender.com';
 
 const MIN_SEARCH_TERM_LENGTH = 3;

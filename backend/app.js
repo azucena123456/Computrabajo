@@ -9,7 +9,6 @@ const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3001;
 
-
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -31,7 +30,6 @@ app.post("/buscar", async (req, res) => {
 
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
         
-        // Usamos @sparticuz/chromium para entornos de Render
         browser = await puppeteer.launch({
             args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
@@ -65,13 +63,23 @@ app.post("/buscar", async (req, res) => {
                 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
                 await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
 
-                await page.waitForSelector("article a", { timeout: 10000 });
+                const noResults = await page.evaluate(() => {
+                    return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
+                });
+
+                if (noResults) {
+                    console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
+                    break;
+                }
+                
+             
+                await page.waitForSelector("main.container > .box_grid > .p10 a", { timeout: 10000 });
             } catch (navigationOrSelectorError) {
                 console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
                 break; 
             }
 
-            const enlaces = await page.$$eval("article a", (links) =>
+            const enlaces = await page.$$eval("main.container > .box_grid > .p10 a", (links) =>
                 Array.from(
                     new Set(
                         links

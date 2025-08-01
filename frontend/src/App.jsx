@@ -197,7 +197,7 @@ function App() {
                     />
                     <button
                         type="submit"
-                        className="bg-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105 w-auto whitespace-nowrap flex-shrink-0"
+                        className="bg-purple-600 text-white font-bold py-2 px-4 rounded-full shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105 w-auto whitespace-nowrap flex-shrink-0"
                         disabled={loading}
                     >
                         {loading ? 'Buscando...' : 'Buscar Empleos'}

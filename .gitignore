@@ -1,12 +1,15 @@
-# Dependencias de Node.js 
+# Dependencias de Node.js (nivel raíz y subdirectorios)
+node_modules/
 backend/node_modules/
-
+frontend/node_modules/
 
 # Archivos relacionados con Expo
-.expo/
+backend/.expo/ # Expo está dentro de backend según tu imagen
 
 # Configuraciones de VSCode
-.vscode/
+.vscode/            # .vscode en la raíz
+backend/.vscode/    # .vscode dentro de backend
+frontend/.vscode/   # .vscode dentro de frontend
 
 # Carpetas de datos en el backend
 backend/data/
@@ -24,7 +27,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-
+# Salidas de compilación (para el frontend)
+# Estas carpetas suelen contener la versión compilada de tu aplicación frontend
+# y generalmente no deben subirse al repositorio.
+frontend/build/
+frontend/dist/
 
 # Archivos del sistema operativo
 .DS_Store
@@ -34,5 +41,6 @@ Thumbs.db
 ejecutar_whatsapp.bat
 enviar_whatsapp.py
 
-# Dependencias de Node.js 
-frontend/node_modules/
+# Archivos de base de datos local o caches específicos de tu proyecto
+# Si 'PyWhatKit_DB.txt' es una base de datos generada localmente y no parte del código fuente
+frontend/PyWhatKit_DB.txt

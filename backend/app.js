@@ -1,8 +1,6 @@
 const chromium = require('@sparticuz/chromium');
-const puppeteer = require("puppeteer-extra"); 
+const puppeteer = require("puppeteer"); 
 const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const pLimit = require('p-limit');
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -10,8 +8,6 @@ const cors = require("cors");
 
 const app = express();
 const port = process.env.PORT || 3001;
-
-puppeteer.use(StealthPlugin());
 
 app.use(cors()); 
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -55,30 +51,30 @@ app.post("/buscar", async (req, res) => {
             'Referer': 'https://www.google.com/', 
         });
 
-        const trabajos = [];
+        let trabajos = [];
         let pagina = 1;
         const maxPagesToScrape = 5;
-        let enlacesTotales = [];
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
-            console.log(`Visitando página de listados para obtener enlaces: ${url}`);
+            console.log(`Visitando página de listados: ${url}`);
 
             try {
                 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
-                
+                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+
                 const noResults = await page.evaluate(() => {
                     return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
                 });
 
                 if (noResults) {
-                    console.warn('No se encontraron resultados para este término de búsqueda. Finalizando la extracción de enlaces.');
+                    console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
                     break;
                 }
                 
                 await page.waitForSelector("article a", { timeout: 10000 });
             } catch (navigationOrSelectorError) {
-                console.warn(`No más páginas o selector no encontrado en ${url}. Fin de la extracción de enlaces.`);
+                console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
                 break; 
             }
 
@@ -91,96 +87,90 @@ app.post("/buscar", async (req, res) => {
                     )
                 )
             );
-            
+
             if (enlaces.length === 0) {
-                console.log("No hay más ofertas, fin de la extracción de enlaces.");
+                console.log(
+                    "No hay más ofertas en esta página o los enlaces no fueron detectados, fin del scraping."
+                );
                 break;
             }
-            
-            enlacesTotales = enlacesTotales.concat(enlaces);
+
+            for (const enlace of enlaces) {
+                console.log(`Extrayendo datos de: ${enlace}`);
+                
+                try {
+                    await page.goto(enlace, {
+                        waitUntil: "domcontentloaded",
+                        timeout: 30000,
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+
+                    const datos = await page.evaluate(() => {
+                        const textoSelector = (sel) =>
+                            document.querySelector(sel)?.innerText.trim() ||
+                            "No disponible";
+
+                        const ubicacionTexto = textoSelector(
+                            "main.detail_fs > div.container > p.fs16"
+                        );
+                        const empresa_ubi = ubicacionTexto.split(" - ");
+                        const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
+                        const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
+
+                        const descripcion = textoSelector(
+                            "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
+                        );
+                        const descrip = descripcion.replace(/\n/g, " ").trim();
+
+                        const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
+                        const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
+
+                        let fechaPublicacion = "No disponible";
+                        const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
+                        const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
+                        const dateElement3 = document.querySelector('span.date');
+
+                        if (dateElement1) {
+                            fechaPublicacion = dateElement1.innerText.trim();
+                        } else if (dateElement2) {
+                            fechaPublicacion = dateElement2.innerText.trim();
+                        } else if (dateElement3) {
+                            fechaPublicacion = dateElement3.innerText.trim();
+                        } else {
+                            const pageText = document.body.innerText;
+                            const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
+                            const match = pageText.match(dateRegex);
+                            if (match && match[0]) {
+                                fechaPublicacion = match[0].trim();
+                            }
+                        }
+
+                        return {
+                            titulo: textoSelector("h1"),
+                            empresa: empresa,
+                            ubicacion: location,
+                            salario: salario,
+                            descripcion: descrip,
+                            url: window.location.href,
+                            fechaPublicacion: fechaPublicacion,
+                        };
+                    });
+
+                    trabajos.push(datos);
+
+                } catch (err) {
+                    console.warn(
+                        `Error al extraer datos de ${enlace}: ${err.message}`
+                    );
+                }
+            }
+
             pagina++;
         }
 
-        console.log(`Enlaces de ofertas encontrados: ${enlacesTotales.length}`);
-
-        const limit = pLimit(5); 
-        
-        const scrapeJobDetail = async (enlace) => {
-            console.log(`Extrayendo datos de: ${enlace}`);
-            const detailPage = await browser.newPage();
-            try {
-                await detailPage.goto(enlace, {
-                    waitUntil: "domcontentloaded",
-                    timeout: 30000,
-                });
-
-                const datos = await detailPage.evaluate(() => {
-                    const textoSelector = (sel) =>
-                        document.querySelector(sel)?.innerText.trim() ||
-                        "No disponible";
-
-                    const ubicacionTexto = textoSelector(
-                        "main.detail_fs > div.container > p.fs16"
-                    );
-                    const empresa_ubi = ubicacionTexto.split(" - ");
-                    const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
-                    const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
-
-                    const descripcion = textoSelector(
-                        "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
-                    );
-                    const descrip = descripcion.replace(/\n/g, " ").trim();
-
-                    const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
-                    const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
-
-                    let fechaPublicacion = "No disponible";
-                    const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
-                    const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
-                    const dateElement3 = document.querySelector('span.date');
-
-                    if (dateElement1) {
-                        fechaPublicacion = dateElement1.innerText.trim();
-                    } else if (dateElement2) {
-                        fechaPublicacion = dateElement2.innerText.trim();
-                    } else if (dateElement3) {
-                        fechaPublicacion = dateElement3.innerText.trim();
-                    } else {
-                        const pageText = document.body.innerText;
-                        const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
-                        const match = pageText.match(dateRegex);
-                        if (match && match[0]) {
-                            fechaPublicacion = match[0].trim();
-                        }
-                    }
-
-                    return {
-                        titulo: textoSelector("h1"),
-                        empresa: empresa,
-                        ubicacion: location,
-                        salario: salario,
-                        descripcion: descrip,
-                        url: window.location.href,
-                        fechaPublicacion: fechaPublicacion,
-                    };
-                });
-                return datos;
-            } catch (err) {
-                console.warn(
-                    `Error al extraer datos de ${enlace}: ${err.message}`
-                );
-                return null;
-            } finally {
-                await detailPage.close();
-            }
-        };
-
-        const scrapedJobs = await Promise.all(enlacesTotales.map(enlace => limit(() => scrapeJobDetail(enlace))));
-        const trabajosFiltrados = scrapedJobs.filter(job => job !== null);
-
         res.status(200).send({
-            offers: trabajosFiltrados,
-            totalResultsCount: trabajosFiltrados.length,
+            offers: trabajos,
+            totalResultsCount: trabajos.length,
             message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
         });
     } catch (error) {

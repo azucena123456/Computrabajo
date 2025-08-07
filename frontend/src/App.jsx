@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ResultsPage from './ResultsPage.jsx';
 
 const API_BASE_URL = 'https://computrabajo.onrender.com';
@@ -16,6 +16,7 @@ function App() {
     const [downloadInfo, setDownloadInfo] = useState(null);
     const [showResultsPage, setShowResultsPage] = useState(false);
     const [totalResultsCount, setTotalResultsCount] = useState(0);
+    const [controller, setController] = useState(null);
 
     const validateSearchTerm = (term) => {
         if (!term.trim()) {
@@ -56,12 +57,14 @@ function App() {
 
         setErrorMessage('');
         setInputError('');
-
         setLoading(true);
         setOffers([]);
         setDownloadInfo(null);
         setShowResultsPage(false);
         setTotalResultsCount(0);
+
+        const newController = new AbortController();
+        setController(newController);
 
         try {
             const response = await fetch(`${API_BASE_URL}/buscar`, {
@@ -70,6 +73,7 @@ function App() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ cargo: trimmedSearchTerm }),
+                signal: newController.signal,
             });
 
             if (!response.ok) {
@@ -98,13 +102,25 @@ function App() {
                 setShowResultsPage(false);
             }
         } catch (error) {
-            console.error('Error al obtener datos:', error);
-            setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);
+            if (error.name === 'AbortError') {
+                console.log('Búsqueda cancelada por el usuario.');
+                setErrorMessage('La búsqueda fue cancelada.');
+            } else {
+                console.error('Error al obtener datos:', error);
+                setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);
+            }
             setOffers([]);
             setTotalResultsCount(0);
             setShowResultsPage(false);
         } finally {
             setLoading(false);
+            setController(null);
+        }
+    };
+
+    const handleCancel = () => {
+        if (controller) {
+            controller.abort();
         }
     };
 
@@ -145,6 +161,13 @@ function App() {
                 <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-500"></div>
                 <p className="mt-4 text-indigo-600 text-xl font-semibold">Cargando ofertas, por favor espera...</p>
                 <p className="text-gray-500 text-sm mt-2">Esto puede tomar un momento, el scraper está trabajando en segundo plano.</p>
+                <button
+                    onClick={handleCancel}
+                    className="mt-4 bg-red-500 text-white font-bold py-2 px-6 rounded-full shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105"
+                    disabled={!loading}
+                >
+                    Cancelar Búsqueda
+                </button>
             </div>
         );
     };

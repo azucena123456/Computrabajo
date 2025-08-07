@@ -1,6 +1,6 @@
 const chromium = require('@sparticuz/chromium');
-const puppeteer = require("puppeteer"); 
-const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
+const puppeteer = require("puppeteer");
+const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -9,27 +9,21 @@ const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors()); 
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 app.get("/", (req, res) => {
-    res.status(200).send({
-        message: "Server funcionando",
-    });
+    res.status(200).send({ message: "Server funcionando" });
 });
 
 app.post("/buscar", async (req, res) => {
     let { cargo } = req.body;
-
     let browser;
     try {
-        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(
-            cargo
-        )}`;
-
+        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(cargo)}`;
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
-        
+
         browser = await puppeteer.launch({
             args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
@@ -48,88 +42,69 @@ app.post("/buscar", async (req, res) => {
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
-            'Referer': 'https://www.google.com/', 
+            'Referer': 'https://www.google.com/',
+        });
+
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+            const type = req.resourceType();
+            if (['image', 'stylesheet', 'font', 'media'].includes(type)) {
+                req.abort();
+            } else {
+                req.continue();
+            }
         });
 
         let trabajos = [];
         let pagina = 1;
-        const maxPagesToScrape = 5;
+        const maxPagesToScrape = 3;
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
             console.log(`Visitando página de listados: ${url}`);
-
             try {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
-                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+                await new Promise(resolve => setTimeout(resolve, 100));
 
                 const noResults = await page.evaluate(() => {
                     return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
                 });
 
-                if (noResults) {
-                    console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
-                    break;
-                }
-                
+                if (noResults) break;
+
                 await page.waitForSelector("article a", { timeout: 10000 });
-            } catch (navigationOrSelectorError) {
-                console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
-                break; 
-            }
-
-            const enlaces = await page.$$eval("article a", (links) =>
-                Array.from(
-                    new Set(
-                        links
-                            .map((link) => link.href)
-                            .filter((href) => href.includes("/ofertas-de-trabajo/"))
-                    )
-                )
-            );
-
-            if (enlaces.length === 0) {
-                console.log(
-                    "No hay más ofertas en esta página o los enlaces no fueron detectados, fin del scraping."
-                );
+            } catch (e) {
+                console.warn(`No más páginas o selector no encontrado en ${url}: ${e.message}`);
                 break;
             }
 
-            for (const enlace of enlaces) {
-                console.log(`Extrayendo datos de: ${enlace}`);
-                
+            const enlaces = await page.$$eval("article a", (links) =>
+                Array.from(new Set(
+                    links.map((link) => link.href).filter((href) => href.includes("/ofertas-de-trabajo/"))
+                ))
+            );
+
+            if (enlaces.length === 0) break;
+
+            const resultados = await Promise.all(enlaces.map(async (enlace) => {
+                const tab = await browser.newPage();
                 try {
-                    await page.goto(enlace, {
-                        waitUntil: "domcontentloaded",
-                        timeout: 30000,
-                    });
-                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
-
-                    const datos = await page.evaluate(() => {
-                        const textoSelector = (sel) =>
-                            document.querySelector(sel)?.innerText.trim() ||
-                            "No disponible";
-
-                        const ubicacionTexto = textoSelector(
-                            "main.detail_fs > div.container > p.fs16"
-                        );
+                    await tab.goto(enlace, { waitUntil: "domcontentloaded", timeout: 30000 });
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    const datos = await tab.evaluate(() => {
+                        const textoSelector = (sel) => document.querySelector(sel)?.innerText.trim() || "No disponible";
+                        const ubicacionTexto = textoSelector("main.detail_fs > div.container > p.fs16");
                         const empresa_ubi = ubicacionTexto.split(" - ");
                         const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
                         const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
-
-                        const descripcion = textoSelector(
-                            "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
-                        );
+                        const descripcion = textoSelector("div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB");
                         const descrip = descripcion.replace(/\n/g, " ").trim();
-
                         const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
                         const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
-
                         let fechaPublicacion = "No disponible";
                         const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
                         const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
                         const dateElement3 = document.querySelector('span.date');
-
                         if (dateElement1) {
                             fechaPublicacion = dateElement1.innerText.trim();
                         } else if (dateElement2) {
@@ -155,16 +130,15 @@ app.post("/buscar", async (req, res) => {
                             fechaPublicacion: fechaPublicacion,
                         };
                     });
-
-                    trabajos.push(datos);
-
+                    await tab.close();
+                    return datos;
                 } catch (err) {
-                    console.warn(
-                        `Error al extraer datos de ${enlace}: ${err.message}`
-                    );
+                    await tab.close();
+                    return null;
                 }
-            }
+            }));
 
+            trabajos.push(...resultados.filter(Boolean));
             pagina++;
         }
 
@@ -173,15 +147,12 @@ app.post("/buscar", async (req, res) => {
             totalResultsCount: trabajos.length,
             message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
         });
+
     } catch (error) {
         console.error("Error global durante el scraping:", error);
-        res.status(500).send({
-            message: `Error en el scraping: ${error.message || error}`,
-        });
+        res.status(500).send({ message: `Error en el scraping: ${error.message || error}` });
     } finally {
-        if (browser) {
-            await browser.close();
-        }
+        if (browser) await browser.close();
     }
 });
 
@@ -193,10 +164,7 @@ app.post('/export/:format', async (req, res) => {
         return res.status(400).send('No se proporcionaron datos válidos para exportar.');
     }
 
-    const cleanedSearchTerm = searchTerm
-        .toLowerCase()
-        .replace(/\s+/g, "_")
-        .replace(/[^a-z0-9_.-]/g, "");
+    const cleanedSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_.-]/g, "");
     const filename = `ofertas_${cleanedSearchTerm}_${new Date().toISOString().split('T')[0]}.${format}`;
 
     try {
@@ -216,7 +184,7 @@ app.post('/export/:format', async (req, res) => {
                 buffer = generateXlsxBuffer(offers);
                 contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 break;
-            case 'pdf': 
+            case 'pdf':
                 buffer = await generatePdfBuffer(offers, searchTerm);
                 contentType = 'application/pdf';
                 break;

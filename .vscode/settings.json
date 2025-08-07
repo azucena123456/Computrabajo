@@ -27,17 +27,7 @@
         "statusBar.prominentBackground": "#ed431d",
         "statusBar.prominentForeground": "#ffffff",
         "statusBar.prominentHoverBackground": "#ed431d",
-        "statusBar.prominentHoverForeground": "#ffffff90",
-        "statusBarItem.remoteBackground": "#fa502a",
-        "statusBarItem.remoteForeground": "#ffffff",
-        "statusBar.background": "#ed431d",
-        "statusBar.foreground": "#ffffff",
-        "statusBar.border": "#ed431d",
-        "statusBar.debuggingBackground": "#ed431d",
-        "statusBar.debuggingForeground": "#ffffff",
-        "statusBar.debuggingBorder": "#ed431d",
-        "activityBarBadge.foreground": "#ffffff",
-        "activityBarBadge.background": "#ed431d"
+        "statusBar.prominentHoverForeground": "#ffffff90"
     },
     "window.title": "d:\\computrabajo",
     "projectColors.mainColor": "#ed431d"

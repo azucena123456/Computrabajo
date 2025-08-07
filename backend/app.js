@@ -13,6 +13,18 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/119.0',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+];
+
 app.get("/", (req, res) => {
     res.status(200).send({
         message: "Server funcionando",
@@ -36,11 +48,11 @@ app.post("/buscar", async (req, res) => {
         });
 
         const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
         await page.setExtraHTTPHeaders({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
             'Upgrade-Insecure-Requests': '1',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
@@ -58,7 +70,7 @@ app.post("/buscar", async (req, res) => {
             
             try {
                 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+                await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000)); // Increased and randomized delay
 
                 const noResults = await page.evaluate(() => {
                     return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
@@ -68,7 +80,7 @@ app.post("/buscar", async (req, res) => {
                     break;
                 }
 
-                await page.waitForSelector("article a", { timeout: 10000 });
+                await page.waitForSelector("article a", { timeout: 15000 }); // Increased timeout
             } catch (navigationOrSelectorError) {
                 break;
             }
@@ -98,11 +110,12 @@ app.post("/buscar", async (req, res) => {
                         const newPage = await browser.newPage();
                         pages.push(newPage);
                         try {
+                            await newPage.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
                             await newPage.goto(enlace, {
                                 waitUntil: "domcontentloaded",
-                                timeout: 30000,
+                                timeout: 45000, // Increased timeout
                             });
-                            await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+                            await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 2000)); // Increased and randomized delay
             
                             const datos = await newPage.evaluate(() => {
                                 const textoSelector = (sel) =>
@@ -158,6 +171,8 @@ app.post("/buscar", async (req, res) => {
             
                         } catch (err) {
                             return null;
+                        } finally {
+                            await newPage.close();
                         }
                     });
             
@@ -165,7 +180,7 @@ app.post("/buscar", async (req, res) => {
                     results.push(...batchResults.filter(result => result !== null));
                 }
             
-                await Promise.all(pages.map(p => p.close()));
+                // Removed the extra page close loop as it's now in the finally block
                 return results;
             };
 

@@ -103,8 +103,12 @@ function App() {
             }
         } catch (error) {
             if (error.name === 'AbortError') {
-                console.log('Búsqueda cancelada por el usuario.');
-                setErrorMessage('La búsqueda fue cancelada.');
+                // Al cancelar la búsqueda, limpiamos el estado
+                setSearchTerm('');
+                setOffers([]);
+                setErrorMessage('');
+                setShowResultsPage(false);
+                setTotalResultsCount(0);
             } else {
                 console.error('Error al obtener datos:', error);
                 setErrorMessage(`¡Error! No se pudieron cargar las ofertas. Por favor, verifica que el backend esté funcionando y sea accesible en ${API_BASE_URL}.`);

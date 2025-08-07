@@ -60,7 +60,7 @@ app.post("/buscar", async (req, res) => {
             console.log(`Visitando página de listados: ${url}`);
 
             try {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 1000 }); 
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
                 await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
 
                 const noResults = await page.evaluate(() => {

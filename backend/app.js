@@ -1,209 +1,76 @@
-const chromium = require('@sparticuz/chromium');
 const puppeteer = require("puppeteer");
-const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
-
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
+const bodyParser = require("body-parser");
+const fs = require("fs");
+const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
 
 const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-app.get("/", (req, res) => {
-    res.status(200).send({ message: "Server funcionando" });
-});
+app.post("/scrape", async (req, res) => {
+  const { puesto } = req.body;
 
-app.post("/buscar", async (req, res) => {
-    let { cargo } = req.body;
-    let browser;
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
 
-    try {
-        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(cargo)}`;
-        console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
+  const enlaces = [];
 
-        browser = await puppeteer.launch({
-            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
-        });
-
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        await page.setExtraHTTPHeaders({
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Referer': 'https://www.google.com/',
-        });
-
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const type = req.resourceType();
-            if (['image', 'stylesheet', 'font', 'media'].includes(type)) {
-                req.abort();
-            } else {
-                req.continue();
-            }
-        });
-
-        let trabajos = [];
-        let pagina = 1;
-        const maxPagesToScrape = 3;
-
-        while (pagina <= maxPagesToScrape) {
-            const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
-            console.log(`Visitando página de listados: ${url}`);
-
-            try {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-                await new Promise(resolve => setTimeout(resolve, 100));
-
-                const noResults = await page.evaluate(() => {
-                    return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
-                });
-
-                if (noResults) break;
-
-                await page.waitForSelector("div.box_offer", { timeout: 10000 });
-            } catch (e) {
-                console.warn(`No más páginas o selector no encontrado en ${url}: ${e.message}`);
-                break;
-            }
-
-            const enlaces = await page.$$eval("div.box_offer a", (links) =>
-                Array.from(new Set(
-                    links.map((link) => link.href).filter((href) => href.includes("/ofertas-de-trabajo/"))
-                ))
-            );
-
-            if (enlaces.length === 0) break;
-
-            const resultados = await Promise.all(enlaces.map(async (enlace) => {
-                const tab = await browser.newPage();
-                try {
-                    await tab.goto(enlace, { waitUntil: "domcontentloaded", timeout: 30000 });
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    const datos = await tab.evaluate(() => {
-                        const textoSelector = (sel) => document.querySelector(sel)?.innerText.trim() || "No disponible";
-                        const ubicacionTexto = textoSelector("main.detail_fs > div.container > p.fs16");
-                        const empresa_ubi = ubicacionTexto.split(" - ");
-                        const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
-                        const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
-                        const descripcion = textoSelector("div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB");
-                        const descrip = descripcion.replace(/\n/g, " ").trim();
-                        const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
-                        const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
-                        let fechaPublicacion = "No disponible";
-                        const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
-                        const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
-                        const dateElement3 = document.querySelector('span.date');
-                        if (dateElement1) {
-                            fechaPublicacion = dateElement1.innerText.trim();
-                        } else if (dateElement2) {
-                            fechaPublicacion = dateElement2.innerText.trim();
-                        } else if (dateElement3) {
-                            fechaPublicacion = dateElement3.innerText.trim();
-                        } else {
-                            const pageText = document.body.innerText;
-                            const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
-                            const match = pageText.match(dateRegex);
-                            if (match && match[0]) {
-                                fechaPublicacion = match[0].trim();
-                            }
-                        }
-
-                        return {
-                            titulo: textoSelector("h1"),
-                            empresa: empresa,
-                            ubicacion: location,
-                            salario: salario,
-                            descripcion: descrip,
-                            url: window.location.href,
-                            fechaPublicacion: fechaPublicacion,
-                        };
-                    });
-                    await tab.close();
-                    return datos;
-                } catch (err) {
-                    await tab.close();
-                    return null;
-                }
-            }));
-
-            trabajos.push(...resultados.filter(Boolean));
-            pagina++;
-        }
-
-        res.status(200).send({
-            offers: trabajos,
-            totalResultsCount: trabajos.length,
-            message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
-        });
-
-    } catch (error) {
-        console.error("Error global durante el scraping:", error);
-        res.status(500).send({ message: `Error en el scraping: ${error.message || error}` });
-    } finally {
-        if (browser) await browser.close();
-    }
-});
-
-app.post('/export/:format', async (req, res) => {
-    const { format } = req.params;
-    const { offers, searchTerm } = req.body;
-
-    if (!offers || !Array.isArray(offers) || offers.length === 0) {
-        return res.status(400).send('No se proporcionaron datos válidos para exportar.');
-    }
-
-    const cleanedSearchTerm = searchTerm.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_.-]/g, "");
-    const filename = `ofertas_${cleanedSearchTerm}_${new Date().toISOString().split('T')[0]}.${format}`;
+  for (let pageIndex = 1; pageIndex <= 5; pageIndex++) {
+    const url = `https://mx.computrabajo.com/trabajo-de-${puesto}?p=${pageIndex}`;
+    await page.goto(url, { waitUntil: "domcontentloaded" });
 
     try {
-        let buffer;
-        let contentType;
-
-        switch (format) {
-            case 'json':
-                buffer = generateJsonBuffer(offers);
-                contentType = 'application/json';
-                break;
-            case 'csv':
-                buffer = generateCsvBuffer(offers);
-                contentType = 'text/csv';
-                break;
-            case 'xlsx':
-                buffer = generateXlsxBuffer(offers);
-                contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                break;
-            case 'pdf':
-                buffer = await generatePdfBuffer(offers, searchTerm);
-                contentType = 'application/pdf';
-                break;
-            default:
-                return res.status(400).send('Formato de exportación no soportado.');
-        }
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
-
-    } catch (error) {
-        console.error(`Error al generar o enviar el archivo ${format}:`, error);
-        res.status(500).send(`Error al generar el archivo ${format}.`);
+      await page.waitForSelector("a.js-o-link", { timeout: 10000 });
+    } catch {
+      break;
     }
+
+    const nuevosEnlaces = await page.$$eval("a.js-o-link", (links) =>
+      Array.from(new Set(
+        links.map((link) => link.href).filter((href) => href.includes("/ofertas-de-trabajo/"))
+      ))
+    );
+
+    if (nuevosEnlaces.length === 0) break;
+
+    enlaces.push(...nuevosEnlaces);
+  }
+
+  const ofertas = [];
+
+  for (const enlace of enlaces) {
+    try {
+      await page.goto(enlace, { waitUntil: "domcontentloaded" });
+
+      const titulo = await page.$eval("h1", (el) => el.innerText.trim());
+      const empresa = await page.$eval("div[data-qa='job-detail-company']", (el) => el.innerText.trim());
+      const salario = await page.$eval("div[data-qa='salary-label']", (el) => el.innerText.trim());
+      const ubicacion = await page.$eval("div[data-qa='location-label']", (el) => el.innerText.trim());
+
+      ofertas.push({ titulo, empresa, salario, ubicacion, enlace });
+    } catch {}
+  }
+
+  await browser.close();
+
+  const jsonBuffer = generateJsonBuffer(ofertas);
+  const csvBuffer = generateCsvBuffer(ofertas);
+  const xlsxBuffer = await generateXlsxBuffer(ofertas);
+  const pdfBuffer = await generatePdfBuffer(ofertas);
+
+  fs.writeFileSync("ofertas.json", jsonBuffer);
+  fs.writeFileSync("ofertas.csv", csvBuffer);
+  fs.writeFileSync("ofertas.xlsx", xlsxBuffer);
+  fs.writeFileSync("ofertas.pdf", pdfBuffer);
+
+  res.json({ success: true, message: "Scraping completado", count: ofertas.length });
 });
 
 app.listen(port, () => {
-    console.log(`Server running in http://localhost:${port}`);
+  console.log(`Servidor escuchando en el puerto ${port}`);
 });

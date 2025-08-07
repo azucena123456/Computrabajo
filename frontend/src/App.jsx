@@ -163,7 +163,7 @@ function App() {
                 <p className="text-gray-500 text-sm mt-2">Esto puede tomar un momento, el scraper está trabajando en segundo plano.</p>
                 <button
                     onClick={handleCancel}
-                    className="mt-4 bg-red-500 text-white font-bold py-2 px-6 rounded-full shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105"
+                    className="mt-4 bg-transparent text-red-500 border border-red-500 font-bold py-2 px-6 rounded-full shadow-md hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 transition duration-300 transform hover:scale-105"
                     disabled={!loading}
                 >
                     Cancelar Búsqueda

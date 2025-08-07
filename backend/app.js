@@ -1,6 +1,6 @@
 const chromium = require('@sparticuz/chromium');
-const puppeteer = require("puppeteer");
-const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
+const puppeteer = require("puppeteer"); 
+const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll"); 
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -9,7 +9,7 @@ const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors()); 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -28,6 +28,8 @@ app.post("/buscar", async (req, res) => {
             cargo
         )}`;
 
+        console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
+        
         browser = await puppeteer.launch({
             args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,
@@ -46,7 +48,7 @@ app.post("/buscar", async (req, res) => {
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
-            'Referer': 'https://www.google.com/',
+            'Referer': 'https://www.google.com/', 
         });
 
         let trabajos = [];
@@ -58,7 +60,7 @@ app.post("/buscar", async (req, res) => {
             console.log(`Visitando página de listados: ${url}`);
 
             try {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 }); 
                 await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
 
                 const noResults = await page.evaluate(() => {
@@ -69,11 +71,11 @@ app.post("/buscar", async (req, res) => {
                     console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
                     break;
                 }
-
+                
                 await page.waitForSelector("article a", { timeout: 10000 });
             } catch (navigationOrSelectorError) {
                 console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
-                break;
+                break; 
             }
 
             const enlaces = await page.$$eval("article a", (links) =>
@@ -95,7 +97,7 @@ app.post("/buscar", async (req, res) => {
 
             for (const enlace of enlaces) {
                 console.log(`Extrayendo datos de: ${enlace}`);
-
+                
                 try {
                     await page.goto(enlace, {
                         waitUntil: "domcontentloaded",
@@ -214,7 +216,7 @@ app.post('/export/:format', async (req, res) => {
                 buffer = generateXlsxBuffer(offers);
                 contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 break;
-            case 'pdf':
+            case 'pdf': 
                 buffer = await generatePdfBuffer(offers, searchTerm);
                 contentType = 'application/pdf';
                 break;

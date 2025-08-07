@@ -72,7 +72,7 @@ app.post("/buscar", async (req, res) => {
                     break;
                 }
                 
-                await page.waitForSelector("article a", { timeout: 10000 });
+                await page.waitForSelector("article a", { timeout: 1000 });
             } catch (navigationOrSelectorError) {
                 console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
                 break; 

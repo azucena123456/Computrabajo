@@ -53,7 +53,7 @@ app.post("/buscar", async (req, res) => {
 
         let trabajos = [];
         let pagina = 1;
-        const maxPagesToScrape = 5;
+        const maxPagesToScrape = 50;
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;

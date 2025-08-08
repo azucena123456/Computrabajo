@@ -1,7 +1,6 @@
 const chromium = require('@sparticuz/chromium');
-const puppeteer = require("puppeteer-core");
-const { generateJsonBuffer, generateXlsxBuffer, generatePdfBuffer, generateCsvBuffer } = require("./js/exportAll");
-
+const puppeteer = require("puppeteer");
+const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -20,13 +19,11 @@ app.get("/", (req, res) => {
 });
 
 app.post("/buscar", async (req, res) => {
-    let { cargo } = req.body;
-
+    const { cargo } = req.body;
     let browser;
+
     try {
-        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(
-            cargo
-        )}`;
+        const baseURL = `https://mx.computrabajo.com/trabajo-de-${encodeURIComponent(cargo)}`;
 
         console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
 
@@ -37,9 +34,10 @@ app.post("/buscar", async (req, res) => {
             headless: chromium.headless,
         });
 
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        await page.setExtraHTTPHeaders({
+    
+        const listPage = await browser.newPage();
+        await listPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await listPage.setExtraHTTPHeaders({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
             'Accept-Language': 'en-US,en;q=0.9',
@@ -53,110 +51,107 @@ app.post("/buscar", async (req, res) => {
 
         let allEnlaces = [];
         let pagina = 1;
-        const maxPagesToScrape = 5;
+        const maxPagesToScrape = 5; 
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
             console.log(`Visitando página de listados: ${url}`);
 
-            try {
-                await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-                await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
+            await listPage.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
+            await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 500));
 
-                const noResults = await page.evaluate(() => {
-                    return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
-                });
-                if (noResults) {
-                    console.log("No se encontraron más resultados. Deteniendo el raspado.");
-                    break;
-                }
+            const noResults = await listPage.evaluate(() => {
+                return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
+            });
 
-                const enlaces = await page.evaluate(() => {
-                    const links = Array.from(document.querySelectorAll('div.js-job-item > header > h2 > a'));
-                    return links.map(a => a.href);
-                });
-
-                if (enlaces.length === 0) {
-                    console.log(`No se encontraron enlaces en la página ${pagina}. Deteniendo el raspado.`);
-                    break;
-                }
-
-                allEnlaces.push(...enlaces);
-                pagina++;
-            } catch (err) {
-                console.warn(`Error al ir a la página de listados ${url}: ${err.message}`);
+            if (noResults) {
+                console.log("No more results found. Stopping search.");
                 break;
             }
+
+            const enlaces = await listPage.evaluate(() => {
+                const links = Array.from(document.querySelectorAll('a.js-o-link'));
+                return links.map((link) => link.href);
+            });
+
+            if (enlaces.length === 0) {
+                console.log(`No links found on page ${pagina}. Stopping search.`);
+                break;
+            }
+
+            allEnlaces.push(...enlaces);
+            pagina++;
         }
 
-        await page.close();
-
+        await listPage.close(); 
         console.log(`Enlaces totales para extraer: ${allEnlaces.length}`);
 
         const trabajos = [];
-        const concurrencyLimit = 5;
+        const concurrencyLimit = 5; 
 
-        const scrapeDetailPage = async (url) => {
+        
+        const scrapeDetailPage = async (browser, url) => {
             const detailPage = await browser.newPage();
             try {
-                await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
                 await detailPage.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-
                 const datos = await detailPage.evaluate(() => {
-                    const textoSelector = (sel) =>
-                        document.querySelector(sel)?.innerText.trim() ||
-                        "No disponible";
+                    const getText = (selector) =>
+                        document.querySelector(selector)?.innerText.trim() || "No disponible";
 
-                    const titulo = textoSelector('div.box_detail_fs > h1');
-                    const empresa = textoSelector('div.box_detail_fs > p.fs18');
-                    const ubicacion = textoSelector('div.box_detail_fs > p.fs16');
-                    const descripcionElement = document.querySelector('div.mbB.fs16');
-                    const descripcion = descripcionElement ? descripcionElement.innerText.trim() : "";
-                    const descrip = descripcion.replace(/\n/g, " ").trim();
+                    const ubicacionTexto = getText("main.detail_fs > div.container > p.fs16");
+                    const [empresa, location] = ubicacionTexto.split(" - ").map(s => s.trim());
 
-                    const salarioElement = document.querySelector('span.salario');
-                    const salario = salarioElement ? salarioElement.innerText.trim() : "No especificado";
-                    
-                    const fechaElement = document.querySelector('p.fs13.fc.aux_mt15');
-                    const fechaPublicacion = fechaElement ? fechaElement.innerText.trim() : "No disponible";
-                
+                    const descripcion = getText("div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB").replace(/\n/g, " ").trim();
+
+                    const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
+                    const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
+
+                    let fechaPublicacion = "No disponible";
+                    const dateElement = document.querySelector('p.fs13.fc.aux_mt15') ||
+                                        document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16') ||
+                                        document.querySelector('span.date');
+
+                    if (dateElement) {
+                        fechaPublicacion = dateElement.innerText.trim();
+                    } else {
+                        const pageText = document.body.innerText;
+                        const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
+                        const match = pageText.match(dateRegex);
+                        if (match && match[0]) {
+                            fechaPublicacion = match[0].trim();
+                        }
+                    }
+
                     return {
-                        titulo,
-                        empresa,
-                        ubicacion,
-                        salario,
-                        descripcion: descrip,
+                        titulo: getText("h1"),
+                        empresa: empresa || "No disponible",
+                        ubicacion: location || "No disponible",
+                        salario: salario,
+                        descripcion: descripcion,
                         url: window.location.href,
-                        fechaPublicacion,
+                        fechaPublicacion: fechaPublicacion,
                     };
                 });
                 return datos;
             } catch (err) {
                 console.warn(`Error al extraer datos de ${url}: ${err.message}`);
-                return null;
+                return null; 
             } finally {
-                if (detailPage && !detailPage.isClosed()) {
-                    await detailPage.close();
-                }
+                await detailPage.close();
             }
         };
 
-        const chunks = [];
-        for (let i = 0; i < allEnlaces.length; i += concurrencyLimit) {
-            chunks.push(allEnlaces.slice(i, i + concurrencyLimit));
-        }
-
-        for (const chunk of chunks) {
-            const pagePromises = chunk.map(enlace => scrapeDetailPage(enlace));
-            const results = await Promise.all(pagePromises);
-            trabajos.push(...results.filter(Boolean));
-        }
+       
+        const promises = allEnlaces.map(enlace => scrapeDetailPage(browser, enlace));
+        const allJobs = await Promise.all(promises);
+        const validJobs = allJobs.filter(job => job !== null);
 
         res.status(200).send({
-            offers: trabajos,
-            totalResultsCount: trabajos.length,
+            offers: validJobs,
+            totalResultsCount: validJobs.length,
             message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
         });
+
     } catch (error) {
         console.error("Error global durante el scraping:", error);
         res.status(500).send({
@@ -191,34 +186,26 @@ app.post('/export/:format', async (req, res) => {
             case 'json':
                 buffer = generateJsonBuffer(offers);
                 contentType = 'application/json';
-                res.setHeader('Content-Type', contentType);
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-                res.send(buffer);
                 break;
             case 'csv':
-                contentType = 'text/csv';
-                res.setHeader('Content-Type', contentType);
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
                 buffer = generateCsvBuffer(offers);
-                res.send(buffer);
+                contentType = 'text/csv';
                 break;
             case 'xlsx':
-                contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-                res.setHeader('Content-Type', contentType);
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
                 buffer = generateXlsxBuffer(offers);
-                res.send(buffer);
+                contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 break;
             case 'pdf':
                 buffer = await generatePdfBuffer(offers, searchTerm);
                 contentType = 'application/pdf';
-                res.setHeader('Content-Type', contentType);
-                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-                res.send(buffer);
                 break;
             default:
                 return res.status(400).send('Formato de exportación no soportado.');
         }
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
 
     } catch (error) {
         console.error(`Error al generar o enviar el archivo ${format}:`, error);

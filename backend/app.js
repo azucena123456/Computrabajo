@@ -10,8 +10,9 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+
+app.use(bodyParser.json({ limit: '50mb' }));
+
 app.get("/", (req, res) => {
     res.status(200).send({
         message: "Server funcionando",
@@ -248,14 +249,11 @@ app.post('/export/:format', async (req, res) => {
 
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        // Opcional: añade el tamaño del contenido. Esto ayuda al navegador a mostrar el progreso.
+ 
+        
         res.setHeader('Content-Length', buffer.length);
 
-        // Se ha cambiado 'res.send(buffer)' por 'res.end(buffer)'.
-        // Esto envía el buffer de manera más directa, aunque sigue cargándolo
-        // por completo en la memoria del servidor. Para archivos
-        // realmente masivos, sería necesario modificar las funciones de generación
-        // para que trabajen con streams.
+      
         res.end(buffer);
 
     } catch (error) {

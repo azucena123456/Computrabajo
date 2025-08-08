@@ -72,7 +72,7 @@ app.post("/buscar", async (req, res) => {
                 }
 
                 const enlaces = await page.evaluate(() => {
-                    const links = Array.from(document.querySelectorAll('div.content > article > div > a'));
+                    const links = Array.from(document.querySelectorAll('div.js-job-item > header > h2 > a'));
                     return links.map(a => a.href);
                 });
 
@@ -107,50 +107,27 @@ app.post("/buscar", async (req, res) => {
                         document.querySelector(sel)?.innerText.trim() ||
                         "No disponible";
 
-                    const ubicacionTexto = textoSelector(
-                        "main.detail_fs > div.container > p.fs16"
-                    );
-                    const empresa_ubi = ubicacionTexto.split(" - ");
-                    const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
-                    const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
-
-                    const descripcionElement = document.querySelector(
-                        "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
-                    );
+                    const titulo = textoSelector('div.box_detail_fs > h1');
+                    const empresa = textoSelector('div.box_detail_fs > p.fs18');
+                    const ubicacion = textoSelector('div.box_detail_fs > p.fs16');
+                    const descripcionElement = document.querySelector('div.mbB.fs16');
                     const descripcion = descripcionElement ? descripcionElement.innerText.trim() : "";
                     const descrip = descripcion.replace(/\n/g, " ").trim();
 
-                    const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
-                    const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
-
-                    let fechaPublicacion = "No disponible";
-                    const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
-                    const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
-                    const dateElement3 = document.querySelector('span.date');
-
-                    if (dateElement1) {
-                        fechaPublicacion = dateElement1.innerText.trim();
-                    } else if (dateElement2) {
-                        fechaPublicacion = dateElement2.innerText.trim();
-                    } else if (dateElement3) {
-                        fechaPublicacion = dateElement3.innerText.trim();
-                    } else {
-                        const pageText = document.body.innerText;
-                        const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
-                        const match = pageText.match(dateRegex);
-                        if (match && match[0]) {
-                            fechaPublicacion = match[0].trim();
-                        }
-                    }
-
+                    const salarioElement = document.querySelector('span.salario');
+                    const salario = salarioElement ? salarioElement.innerText.trim() : "No especificado";
+                    
+                    const fechaElement = document.querySelector('p.fs13.fc.aux_mt15');
+                    const fechaPublicacion = fechaElement ? fechaElement.innerText.trim() : "No disponible";
+                
                     return {
-                        titulo: textoSelector("h1"),
-                        empresa: empresa,
-                        ubicacion: location,
-                        salario: salario,
+                        titulo,
+                        empresa,
+                        ubicacion,
+                        salario,
                         descripcion: descrip,
                         url: window.location.href,
-                        fechaPublicacion: fechaPublicacion,
+                        fechaPublicacion,
                     };
                 });
                 return datos;

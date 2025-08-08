@@ -168,7 +168,7 @@ app.post("/buscar", async (req, res) => {
             pagina++;
         }
 
-        res.status(200).send({
+        res.status(200).send({ 
             offers: trabajos,
             totalResultsCount: trabajos.length,
             message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",

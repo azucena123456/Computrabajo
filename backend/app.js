@@ -28,6 +28,8 @@ app.post("/buscar", async (req, res) => {
             cargo
         )}`;
 
+        console.log(`:::::::: Buscando trabajos de "${cargo}" ::::::::::`);
+
         browser = await puppeteer.launch({
             args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
             defaultViewport: chromium.defaultViewport,

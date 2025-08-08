@@ -1,6 +1,6 @@
 const chromium = require('@sparticuz/chromium');
-const puppeteer = require("puppeteer");
-const { generateJsonBuffer, generateCsvBuffer, generateXlsxBuffer, generatePdfBuffer } = require("./js/exportAll");
+const puppeteer = require("puppeteer-core");
+const { generateJsonBuffer, generateXlsxBuffer, generatePdfBuffer, generateCsvBuffer } = require("./js/exportAll");
 
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -10,8 +10,8 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false, limit: '50mb' }));
-app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 app.get("/", (req, res) => {
     res.status(200).send({
@@ -51,9 +51,9 @@ app.post("/buscar", async (req, res) => {
             'Referer': 'https://www.google.com/',
         });
 
-        let trabajos = [];
+        let allEnlaces = [];
         let pagina = 1;
-        const maxPagesToScrape = 50;
+        const maxPagesToScrape = 5;
 
         while (pagina <= maxPagesToScrape) {
             const url = pagina === 1 ? baseURL : `${baseURL}?p=${pagina}`;
@@ -66,109 +66,114 @@ app.post("/buscar", async (req, res) => {
                 const noResults = await page.evaluate(() => {
                     return document.querySelector('p.h1.fs32') && document.querySelector('p.h1.fs32').innerText.includes('Sin resultados');
                 });
-
                 if (noResults) {
-                    console.warn('No se encontraron resultados para este término de búsqueda. Finalizando el scraping.');
+                    console.log("No se encontraron más resultados. Deteniendo el raspado.");
                     break;
                 }
 
-                await page.waitForSelector("article a", { timeout: 10000 });
-            } catch (navigationOrSelectorError) {
-                console.warn(`No más páginas o selector no encontrado en ${url}: ${navigationOrSelectorError.message}`);
-                break;
-            }
+                const enlaces = await page.evaluate(() => {
+                    const links = Array.from(document.querySelectorAll('div.content > article > div > a'));
+                    return links.map(a => a.href);
+                });
 
-            const enlaces = await page.$$eval("article a", (links) =>
-                Array.from(
-                    new Set(
-                        links
-                            .map((link) => link.href)
-                            .filter((href) => href.includes("/ofertas-de-trabajo/"))
-                    )
-                )
-            );
-
-            if (enlaces.length === 0) {
-                console.log(
-                    "No hay más ofertas en esta página o los enlaces no fueron detectados, fin del scraping."
-                );
-                break;
-            }
-
-            for (const enlace of enlaces) {
-                console.log(`Extrayendo datos de: ${enlace}`);
-
-                try {
-                    await page.goto(enlace, {
-                        waitUntil: "domcontentloaded",
-                        timeout: 30000,
-                    });
-                    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
-
-                    const datos = await page.evaluate(() => {
-                        const textoSelector = (sel) =>
-                            document.querySelector(sel)?.innerText.trim() ||
-                            "No disponible";
-
-                        const ubicacionTexto = textoSelector(
-                            "main.detail_fs > div.container > p.fs16"
-                        );
-                        const empresa_ubi = ubicacionTexto.split(" - ");
-                        const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
-                        const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
-
-                        const descripcion = textoSelector(
-                            "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
-                        );
-                        const descrip = descripcion.replace(/\n/g, " ").trim();
-
-                        const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
-                        const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
-
-                        let fechaPublicacion = "No disponible";
-                        const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
-                        const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
-                        const dateElement3 = document.querySelector('span.date');
-
-                        if (dateElement1) {
-                            fechaPublicacion = dateElement1.innerText.trim();
-                        } else if (dateElement2) {
-                            fechaPublicacion = dateElement2.innerText.trim();
-                        } else if (dateElement3) {
-                            fechaPublicacion = dateElement3.innerText.trim();
-                        } else {
-                            const pageText = document.body.innerText;
-                            const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
-                            const match = pageText.match(dateRegex);
-                            if (match && match[0]) {
-                                fechaPublicacion = match[0].trim();
-                            }
-                        }
-
-                        return {
-                            titulo: textoSelector("h1"),
-                            empresa: empresa,
-                            ubicacion: location,
-                            salario: salario,
-                            descripcion: descrip,
-                            url: window.location.href,
-                            fechaPublicacion: fechaPublicacion,
-                        };
-                    });
-
-                    trabajos.push(datos);
-
-                } catch (err) {
-                    console.warn(
-                        `Error al extraer datos de ${enlace}: ${err.message}`
-                    );
+                if (enlaces.length === 0) {
+                    console.log(`No se encontraron enlaces en la página ${pagina}. Deteniendo el raspado.`);
+                    break;
                 }
-            }
 
-            pagina++;
+                allEnlaces.push(...enlaces);
+                pagina++;
+            } catch (err) {
+                console.warn(`Error al ir a la página de listados ${url}: ${err.message}`);
+                break;
+            }
         }
 
-        res.status(200).send({ 
+        await page.close();
+
+        console.log(`Enlaces totales para extraer: ${allEnlaces.length}`);
+
+        const trabajos = [];
+        const concurrencyLimit = 5;
+
+        const scrapeDetailPage = async (url) => {
+            const detailPage = await browser.newPage();
+            try {
+                await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+                await detailPage.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+                const datos = await detailPage.evaluate(() => {
+                    const textoSelector = (sel) =>
+                        document.querySelector(sel)?.innerText.trim() ||
+                        "No disponible";
+
+                    const ubicacionTexto = textoSelector(
+                        "main.detail_fs > div.container > p.fs16"
+                    );
+                    const empresa_ubi = ubicacionTexto.split(" - ");
+                    const location = empresa_ubi[1] ? empresa_ubi[1].trim() : "No disponible";
+                    const empresa = empresa_ubi[0] ? empresa_ubi[0].trim() : "No disponible";
+
+                    const descripcionElement = document.querySelector(
+                        "div.container > div.box_detail.fl.w100_m > div.mb40.pb40.bb1 > p.mbB"
+                    );
+                    const descripcion = descripcionElement ? descripcionElement.innerText.trim() : "";
+                    const descrip = descripcion.replace(/\n/g, " ").trim();
+
+                    const salarioMatch = document.body.innerText.match(/\$\s*[\d.,]+\s*(?:a\s*|por\s*)?(?:mes|año|hora)?/i);
+                    const salario = salarioMatch ? salarioMatch[0].trim() : "No especificado";
+
+                    let fechaPublicacion = "No disponible";
+                    const dateElement1 = document.querySelector('p.fs13.fc.aux_mt15');
+                    const dateElement2 = document.querySelector('div.box_detail.fl.w100_m > div.mbB.fs16');
+                    const dateElement3 = document.querySelector('span.date');
+
+                    if (dateElement1) {
+                        fechaPublicacion = dateElement1.innerText.trim();
+                    } else if (dateElement2) {
+                        fechaPublicacion = dateElement2.innerText.trim();
+                    } else if (dateElement3) {
+                        fechaPublicacion = dateElement3.innerText.trim();
+                    } else {
+                        const pageText = document.body.innerText;
+                        const dateRegex = /(hace\s+\d+\s+(?:hora|horas|día|días|mes|meses|año|años))|(\d{1,2}\/\d{1,2}\/\d{2,4})|(\d{1,2}\s+de\s+\w+\s+de\s+\d{4})/i;
+                        const match = pageText.match(dateRegex);
+                        if (match && match[0]) {
+                            fechaPublicacion = match[0].trim();
+                        }
+                    }
+
+                    return {
+                        titulo: textoSelector("h1"),
+                        empresa: empresa,
+                        ubicacion: location,
+                        salario: salario,
+                        descripcion: descrip,
+                        url: window.location.href,
+                        fechaPublicacion: fechaPublicacion,
+                    };
+                });
+                return datos;
+            } catch (err) {
+                console.warn(`Error al extraer datos de ${url}: ${err.message}`);
+                return null;
+            } finally {
+                await detailPage.close();
+            }
+        };
+
+        const chunks = [];
+        for (let i = 0; i < allEnlaces.length; i += concurrencyLimit) {
+            chunks.push(allEnlaces.slice(i, i + concurrencyLimit));
+        }
+
+        for (const chunk of chunks) {
+            const pagePromises = chunk.map(enlace => scrapeDetailPage(enlace));
+            const results = await Promise.all(pagePromises);
+            trabajos.push(...results.filter(Boolean));
+        }
+
+        res.status(200).send({
             offers: trabajos,
             totalResultsCount: trabajos.length,
             message: "::::::::::::: Scrapeo realizado con exito ::::::::::::::",
@@ -207,26 +212,34 @@ app.post('/export/:format', async (req, res) => {
             case 'json':
                 buffer = generateJsonBuffer(offers);
                 contentType = 'application/json';
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.send(buffer);
                 break;
             case 'csv':
-                buffer = generateCsvBuffer(offers);
                 contentType = 'text/csv';
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                buffer = generateCsvBuffer(offers);
+                res.send(buffer);
                 break;
             case 'xlsx':
-                buffer = generateXlsxBuffer(offers);
                 contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                buffer = generateXlsxBuffer(offers);
+                res.send(buffer);
                 break;
             case 'pdf':
                 buffer = await generatePdfBuffer(offers, searchTerm);
                 contentType = 'application/pdf';
+                res.setHeader('Content-Type', contentType);
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.send(buffer);
                 break;
             default:
                 return res.status(400).send('Formato de exportación no soportado.');
         }
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
 
     } catch (error) {
         console.error(`Error al generar o enviar el archivo ${format}:`, error);
